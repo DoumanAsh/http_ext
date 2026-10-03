@@ -1,0 +1,42 @@
+[package]
+name = "http_ext"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Extensions to provide useful utilities for http crate"
+readme = "README.md"
+repository = "https://github.com/DoumanAsh/http_ext"
+license = "BSL-1.0"
+keywords = ["http"]
+categories = ["web-programming"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
+[dependencies.http]
+version = "1"
+default-features = false
+features = ["std"]
+
+[dependencies.bytes]
+version = "1"
+default-features = false
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = ["alloc"]
+
+[dependencies.ryu]
+version = "1"
+default-features = false
+
+[dependencies.itoa]
+version = "1"
+default-features = false
+
+[dependencies.percent-encoding]
+version = "2"
+default-features = false

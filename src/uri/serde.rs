@@ -1,0 +1,992 @@
+use core::{fmt, marker, mem};
+use alloc::borrow::Cow;
+
+pub use serde::{ser, Serialize};
+
+use super::{QueryEncoding, UriPathQueryBuilder};
+
+#[derive(Clone, Debug)]
+pub struct Error {
+    msg: Cow<'static, str>,
+}
+
+impl Error {
+    const fn expected_string_key() -> Self {
+        Self {
+            msg: Cow::Borrowed("Query key must be string"),
+        }
+    }
+
+    const fn expected_struct_like() -> Self {
+        Self {
+            msg: Cow::Borrowed("Query params expect struct/map"),
+        }
+    }
+
+    const fn expected_string_like_value() -> Self {
+        Self {
+            msg: Cow::Borrowed("Query value must be string or number"),
+        }
+    }
+
+    const fn expected_value() -> Self {
+        Self {
+            msg: Cow::Borrowed("Query value cannot be struct/map/sequence/tuple"),
+        }
+    }
+
+    const fn expected_pair() -> Self {
+        Self {
+            msg: Cow::Borrowed("Element in sequence must be pair of key and value"),
+        }
+    }
+
+    #[cold]
+    #[inline(never)]
+    const fn unexpected_pair_serde_error() -> Self {
+        Self {
+            msg: Cow::Borrowed(
+                "Internal error: Pair was supposed to have 2 elements but it is not the case",
+            ),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str(self.msg.as_ref())
+    }
+}
+
+impl core::error::Error for Error {}
+
+impl ser::Error for Error {
+    #[inline]
+    fn custom<T: fmt::Display>(msg: T) -> Self {
+        use alloc::string::ToString;
+        Self {
+            msg: msg.to_string().into(),
+        }
+    }
+}
+
+///[UriPathQueryBuilder] serializer
+pub struct QueryVisitor<'a, T> {
+    output: &'a mut UriPathQueryBuilder<T>,
+    _typ: marker::PhantomData<T>,
+}
+
+impl<'a, T: QueryEncoding> QueryVisitor<'a, T> {
+    pub fn new(output: &'a mut UriPathQueryBuilder<T>) -> Self {
+        Self {
+            output,
+            _typ: marker::PhantomData,
+        }
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::Serializer for QueryVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+    type SerializeSeq = QueryFieldPairSeqVisitor<'output, T>;
+    type SerializeMap = QueryFieldMapVisitor<'output, T>;
+    type SerializeTuple = QueryFieldPairSeqVisitor<'output, T>;
+    type SerializeStruct = QueryVisitor<'output, T>;
+    type SerializeTupleStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStructVariant = QueryVisitor<'output, T>;
+
+    fn serialize_bool(self, _v: bool) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_i8(self, _v: i8) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_i16(self, _v: i16) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_i32(self, _v: i32) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_i64(self, _v: i64) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_u8(self, _v: u8) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_u16(self, _v: u16) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_u32(self, _v: u32) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_u64(self, _v: u64) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_f32(self, _v: f32) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_f64(self, _v: f64) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_char(self, _v: char) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_str(self, _value: &str) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_bytes(self, _value: &[u8]) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    /// Returns `Ok`.
+    fn serialize_unit(self) -> Result<Self::Ok, Error> {
+        Ok(())
+    }
+
+    /// Returns `Ok`.
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Error> {
+        Ok(())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    /// Serializes the inner value, ignoring the newtype name.
+    fn serialize_newtype_struct<V: ?Sized + ser::Serialize>(
+        self,
+        _name: &'static str,
+        value: &V,
+    ) -> Result<Self::Ok, Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<V: ?Sized + ser::Serialize>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _value: &V,
+    ) -> Result<Self::Ok, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    /// Returns `Ok`.
+    fn serialize_none(self) -> Result<Self::Ok, Error> {
+        Ok(())
+    }
+
+    /// Serializes the given value.
+    fn serialize_some<V: ?Sized + ser::Serialize>(self, value: &V) -> Result<Self::Ok, Error> {
+        value.serialize(self)
+    }
+
+    /// Serialize a sequence, given length (if any) is ignored.
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+        Ok(QueryFieldPairSeqVisitor::new(self.output))
+    }
+
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Error> {
+        Ok(QueryFieldPairSeqVisitor::new(self.output))
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Error> {
+        Err(Error::expected_struct_like())
+    }
+
+    /// Serializes a map, given length is ignored.
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
+        Ok(QueryFieldMapVisitor::new(self.output))
+    }
+
+    /// Serializes a struct, given length is ignored.
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Error> {
+        Ok(self)
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant, Error> {
+        Ok(self)
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeStructVariant for QueryVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<V: ?Sized + ser::Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &V,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.output.add_key(key);
+        value.serialize(QueryFieldVisitor::<T>::new(self.output))
+    }
+
+    fn skip_field(&mut self, _key: &'static str) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeStruct for QueryVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<V: ?Sized + ser::Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &V,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.output.add_key(key);
+        value.serialize(QueryFieldVisitor::<T>::new(self.output))
+    }
+
+    fn skip_field(&mut self, _key: &'static str) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+///Struct field's value visitor
+struct QueryFieldVisitor<'a, T> {
+    params: &'a mut UriPathQueryBuilder<T>,
+    _typ: marker::PhantomData<T>,
+}
+
+impl<'a, T: QueryEncoding> QueryFieldVisitor<'a, T> {
+    fn new(params: &'a mut UriPathQueryBuilder<T>) -> Self {
+        Self {
+            params,
+            _typ: marker::PhantomData,
+        }
+    }
+}
+
+impl<T: QueryEncoding> ser::Serializer for QueryFieldVisitor<'_, T> {
+    type Ok = ();
+    type Error = Error;
+    type SerializeStructVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTuple = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeMap = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeSeq = ser::Impossible<Self::Ok, Self::Error>;
+
+    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Error> {
+        let value = if value { "true" } else { "false" };
+        self.serialize_str(value)
+    }
+
+    fn serialize_i8(self, value: i8) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_i16(self, value: i16) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_u8(self, value: u8) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_u16(self, value: u16) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_u32(self, value: u32) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Error> {
+        self.serialize_str(itoa::Buffer::new().format(value))
+    }
+
+    fn serialize_f32(self, value: f32) -> Result<Self::Ok, Error> {
+        self.serialize_str(ryu::Buffer::new().format(value))
+    }
+
+    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Error> {
+        self.serialize_str(ryu::Buffer::new().format(value))
+    }
+
+    fn serialize_char(self, value: char) -> Result<Self::Ok, Error> {
+        //unicode max length is 4 bytes
+        let mut buffer = [0u8; 4];
+        let value = value.encode_utf8(&mut buffer);
+        self.serialize_str(value)
+    }
+
+    fn serialize_str(self, value: &str) -> Result<Self::Ok, Error> {
+        self.params.add_value(value);
+        Ok(())
+    }
+
+    fn serialize_bytes(self, _value: &[u8]) -> Result<Self::Ok, Error> {
+        Err(Error::expected_string_like_value())
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Error> {
+        Err(Error::expected_value())
+    }
+
+    /// Serializes the inner value, ignoring the newtype name.
+    fn serialize_newtype_struct<V: ?Sized + ser::Serialize>(
+        self,
+        _name: &'static str,
+        value: &V,
+    ) -> Result<Self::Ok, Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<V: ?Sized + ser::Serialize>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _value: &V,
+    ) -> Result<Self::Ok, Error> {
+        Err(Error::expected_value())
+    }
+
+    /// Skip field if it is None
+    fn serialize_none(self) -> Result<Self::Ok, Error> {
+        Ok(())
+    }
+
+    /// Serializes the given value.
+    fn serialize_some<V: ?Sized + ser::Serialize>(self, value: &V) -> Result<Self::Ok, Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Error> {
+        Err(Error::expected_value())
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant, Error> {
+        Err(Error::expected_value())
+    }
+}
+
+//Serializer for dynamic key field.
+//
+//Key field must be string or string like type
+struct KeyField<'output, Q> {
+    params: &'output mut UriPathQueryBuilder<Q>,
+}
+
+impl<'output, Q: QueryEncoding> ser::Serializer for KeyField<'output, Q> {
+    type Ok = ();
+    type Error = Error;
+    type SerializeStructVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTuple = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeMap = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeSeq = ser::Impossible<Self::Ok, Self::Error>;
+
+    fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
+        self.params.add_key(value);
+        Ok(())
+    }
+
+    fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+        let mut buffer = [0u8; 4];
+        let value = value.encode_utf8(&mut buffer);
+        self.serialize_str(value)
+    }
+
+    fn serialize_some<T: ?Sized + ser::Serialize>(
+        self,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_bool(self, _: bool) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_f32(self, _: f32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_f64(self, _: f64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_i8(self, _: i8) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_i16(self, _: i16) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_i32(self, _: i32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_i64(self, _: i64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_i128(self, _: i128) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_u8(self, _: u8) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_u16(self, _: u16) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_u32(self, _: u32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_u64(self, _: u64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_u128(self, _: u128) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+
+    fn collect_seq<I: IntoIterator>(self, _: I) -> Result<Self::Ok, Self::Error>
+    where
+        <I as IntoIterator>::Item: ser::Serialize,
+    {
+        Err(Error::expected_string_key())
+    }
+
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Err(Error::expected_string_key())
+    }
+}
+
+///Map visitor
+pub struct QueryFieldMapVisitor<'a, T> {
+    params: &'a mut UriPathQueryBuilder<T>,
+    _typ: marker::PhantomData<T>,
+}
+
+impl<'a, T: QueryEncoding> QueryFieldMapVisitor<'a, T> {
+    fn new(params: &'a mut UriPathQueryBuilder<T>) -> Self {
+        Self {
+            params,
+            _typ: marker::PhantomData,
+        }
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeMap for QueryFieldMapVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_key<K: ?Sized + ser::Serialize>(&mut self, key: &K) -> Result<(), Self::Error> {
+        let dest = KeyField { params: self.params };
+        key.serialize(dest)
+    }
+
+    fn serialize_value<V: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &V,
+    ) -> Result<(), Self::Error> {
+        let params = &mut *self.params;
+        let ser = QueryFieldVisitor::<T>::new(params);
+        let result = value.serialize(ser);
+        result
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+enum QueryPairState {
+    Empty,
+    HasKey,
+    Done,
+}
+
+///Pair visitor that expects tuple with 2 elements
+struct QueryPairVisitor<'a, T> {
+    params: &'a mut UriPathQueryBuilder<T>,
+    state: QueryPairState,
+    _typ: marker::PhantomData<T>,
+}
+
+impl<'output, T: QueryEncoding> ser::Serializer for QueryPairVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+    type SerializeStructVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeStruct = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeTuple = QueryPairVisitor<'output, T>;
+    type SerializeMap = ser::Impossible<Self::Ok, Self::Error>;
+    type SerializeSeq = ser::Impossible<Self::Ok, Self::Error>;
+
+    fn serialize_str(self, _: &str) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_char(self, _: char) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn collect_str<V: ?Sized + fmt::Display>(self, _: &V) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_some<V: ?Sized + ser::Serialize>(
+        self,
+        value: &V,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_bytes(self, _: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        if len == 2 {
+            Ok(self)
+        } else {
+            Err(Error::expected_pair())
+        }
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+
+    fn serialize_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_newtype_struct<V: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: &V,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_newtype_variant<V: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: &V,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_bool(self, _: bool) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_f32(self, _: f32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_f64(self, _: f64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_i8(self, _: i8) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_i16(self, _: i16) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_i32(self, _: i32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_i64(self, _: i64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_i128(self, _: i128) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_u8(self, _: u8) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_u16(self, _: u16) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_u32(self, _: u32) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_u64(self, _: u64) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_u128(self, _: u128) -> Result<Self::Ok, Self::Error> {
+        Err(Error::expected_pair())
+    }
+
+    fn collect_seq<I: IntoIterator>(self, _: I) -> Result<Self::Ok, Self::Error>
+    where
+        <I as IntoIterator>::Item: ser::Serialize,
+    {
+        Err(Error::expected_pair())
+    }
+
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Err(Error::expected_pair())
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeTuple for QueryPairVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_element<V: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &V,
+    ) -> Result<(), Self::Error> {
+        match mem::replace(&mut self.state, QueryPairState::Done) {
+            QueryPairState::Empty => {
+                let dest = KeyField { params: self.params };
+                value.serialize(dest)?;
+                self.state = QueryPairState::HasKey;
+                Ok(())
+            }
+            QueryPairState::HasKey => {
+                let params = &mut *self.params;
+                let ser = QueryFieldVisitor::<T>::new(params);
+                value.serialize(ser)
+            }
+            //Unreachable unless bug in code
+            QueryPairState::Done => Err(Error::unexpected_pair_serde_error()),
+        }
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        match self.state {
+            QueryPairState::Done => Ok(()),
+            _ => Err(Error::unexpected_pair_serde_error()),
+        }
+    }
+}
+
+///Pair Sequence visitor
+pub struct QueryFieldPairSeqVisitor<'a, T> {
+    params: &'a mut UriPathQueryBuilder<T>,
+    _typ: marker::PhantomData<T>,
+}
+
+impl<'a, T: QueryEncoding> QueryFieldPairSeqVisitor<'a, T> {
+    fn new(params: &'a mut UriPathQueryBuilder<T>) -> Self {
+        Self {
+            params,
+            _typ: marker::PhantomData,
+        }
+    }
+
+    fn get_visitor(&mut self) -> QueryPairVisitor<'_, T> {
+        QueryPairVisitor::<T> {
+            params: &mut *self.params,
+            state: QueryPairState::Empty,
+            _typ: marker::PhantomData,
+        }
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeTuple for QueryFieldPairSeqVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_element<E: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &E,
+    ) -> Result<(), Self::Error> {
+        value.serialize(self.get_visitor())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl<'output, T: QueryEncoding> ser::SerializeSeq for QueryFieldPairSeqVisitor<'output, T> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_element<E: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &E,
+    ) -> Result<(), Self::Error> {
+        value.serialize(self.get_visitor())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}

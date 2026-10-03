@@ -1,5 +1,7 @@
 //! URI utilities
 
+pub use http::uri::{Uri, InvalidUri};
+
 mod serde;
 
 mod encodings {

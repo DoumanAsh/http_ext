@@ -8,3 +8,4 @@ extern crate alloc;
 pub use http;
 
 pub mod uri;
+pub mod header;

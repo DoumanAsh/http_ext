@@ -1,4 +1,4 @@
-//! URI utilities
+//!URI module
 
 pub use http::uri::{Uri, InvalidUri};
 
@@ -145,6 +145,10 @@ pub struct UriPathQueryBuilder<Q> {
 }
 
 impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
+    const QUERY_START: &[u8] = &[b'?'];
+    const QUERY_NEXT: &[u8] = &[b'&'];
+    const QUERY_SEP: &[u8] = &[b'='];
+
     #[inline]
     ///Creates new URI's query builder
     pub fn new(path: UriPathBuilder<impl PathEncoding>, encoder: Q) -> Self {
@@ -159,9 +163,9 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
         self.output.reserve(key.len().saturating_add(1));
 
         if self.len == 0 {
-            self.output.extend_from_slice(b"?");
+            self.output.extend_from_slice(Self::QUERY_START);
         } else {
-            self.output.extend_from_slice(b"&");
+            self.output.extend_from_slice(Self::QUERY_NEXT);
         }
 
         for component in Q::encode(key) {
@@ -175,7 +179,7 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     fn add_value(&mut self, value: &str) -> &mut Self {
         self.output.reserve(value.len().saturating_add(1));
 
-        self.output.extend_from_slice(b"=");
+        self.output.extend_from_slice(Self::QUERY_SEP);
 
         for component in Q::encode(value) {
             self.output.extend_from_slice(component.as_bytes());
@@ -189,16 +193,16 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
         self.output.reserve(key.len().saturating_add(value.len()).saturating_add(2));
 
         if self.len == 0 {
-            self.output.extend_from_slice(b"?");
+            self.output.extend_from_slice(Self::QUERY_START);
         } else {
-            self.output.extend_from_slice(b"&");
+            self.output.extend_from_slice(Self::QUERY_NEXT);
         }
 
         for component in Q::encode(key) {
             self.output.extend_from_slice(component.as_bytes());
         }
 
-        self.output.extend_from_slice(b"=");
+        self.output.extend_from_slice(Self::QUERY_SEP);
 
         for component in Q::encode(value) {
             self.output.extend_from_slice(component.as_bytes());

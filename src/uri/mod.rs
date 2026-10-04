@@ -117,7 +117,7 @@ impl<P: PathEncoding> UriPathBuilder<P> {
     #[inline(always)]
     ///Finalizes builder
     pub fn try_into_http(self) -> Result<http::uri::PathAndQuery, http::uri::InvalidUri> {
-        http::uri::PathAndQuery::from_maybe_shared(self.output)
+        http::uri::PathAndQuery::from_maybe_shared(self.output.freeze())
     }
 
     #[inline]
@@ -220,7 +220,7 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     #[inline(always)]
     ///Finalizes builder
     pub fn try_into_http(self) -> Result<http::uri::PathAndQuery, http::uri::InvalidUri> {
-        http::uri::PathAndQuery::from_maybe_shared(self.output)
+        http::uri::PathAndQuery::from_maybe_shared(self.output.freeze())
     }
 }
 

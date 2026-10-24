@@ -7,6 +7,7 @@ extern crate std;
 
 use core::{mem, fmt};
 use alloc::vec::Vec;
+use alloc::string::{String, FromUtf8Error};
 use alloc::collections::{TryReserveError};
 
 #[cfg(feature = "http-body")]
@@ -172,8 +173,7 @@ impl Accum for Vec<u8> {
 
     #[inline(always)]
     fn finish(&mut self) -> Result<Self::Output, Self::Error> {
-        let mut result = Vec::new();
-        mem::swap(&mut result, self);
+        let result = mem::take(self);
         Ok(result)
     }
 }
@@ -203,6 +203,128 @@ impl Accum for bytes::BytesMut {
     fn finish(&mut self) -> Result<Self::Output, Self::Error> {
         let result = self.split();
         Ok(result.freeze())
+    }
+}
+
+///Possible error kinds of [Utf8Error]
+pub enum Utf8ErrorKind {
+    ///Invalid UTF-8
+    Decode(core::str::Utf8Error),
+    ///Failed to allocate memory
+    Alloc(TryReserveError)
+}
+
+impl fmt::Debug for Utf8ErrorKind {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Alloc(error) => fmt::Debug::fmt(error, fmt),
+            Self::Decode(error) => fmt::Debug::fmt(error, fmt),
+        }
+    }
+}
+
+impl fmt::Display for Utf8ErrorKind {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Alloc(error) => fmt.write_fmt(format_args!("Failed to decode: {error}")),
+            Self::Decode(error) => fmt.write_fmt(format_args!("Incomplete string: {error}")),
+        }
+    }
+}
+
+impl core::error::Error for Utf8ErrorKind {
+    #[inline(always)]
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self::Alloc(error) => Some(error),
+            Self::Decode(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug)]
+///[Utf8] error
+pub struct Utf8Error {
+    ///Buffer passed by [Utf8]
+    pub buffer: Vec<u8>,
+    ///Error kind
+    pub kind: Utf8ErrorKind,
+}
+
+impl fmt::Display for Utf8Error {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.kind, fmt)
+    }
+}
+
+impl core::error::Error for Utf8Error {
+    #[inline(always)]
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        core::error::Error::source(&self.kind)
+    }
+}
+
+///[Accum] that buffers data expecting string
+///
+///Actual parsing only happens once [Accum::finish] is called
+pub struct Utf8(pub Vec<u8>);
+
+impl Utf8 {
+    #[inline(always)]
+    ///Creates new accumulator potentially reusing existing String buffer
+    pub fn new(buffer: String) -> Self {
+        Self(buffer.into_bytes())
+    }
+
+    #[inline(always)]
+    ///Attempts to decode string, returning error with invalid utf-8 buffer in case of error
+    pub fn try_decode(&mut self) -> Result<String, FromUtf8Error> {
+        let buffer = mem::take(&mut self.0);
+        String::from_utf8(buffer)
+    }
+}
+
+impl Accum for Utf8 {
+    ///Content accumulated in the buffer returned from [Accum::finish]
+    ///
+    ///If string decoding fails, you can attempt to do lossy decoding by taking buffer from the error.
+    type Output = String;
+    type Error = Utf8Error;
+
+    #[inline(always)]
+    fn write(&mut self, data: &[u8]) -> Result<(), Self::Error> {
+        if let Err(error) = self.0.try_reserve(data.len()) {
+            Err(Utf8Error {
+                buffer: mem::take(&mut self.0),
+                kind: Utf8ErrorKind::Alloc(error)
+            })
+        } else {
+            self.0.extend_from_slice(data);
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline(always)]
+    fn on_trailers(&mut self, _: http::HeaderMap) {
+    }
+
+    #[inline(always)]
+    fn finish(&mut self) -> Result<Self::Output, Self::Error> {
+        match self.try_decode() {
+            Ok(result) => Ok(result),
+            Err(error) => Err(Utf8Error {
+                kind: Utf8ErrorKind::Decode(error.utf8_error()),
+                buffer: error.into_bytes()
+            })
+        }
     }
 }
 

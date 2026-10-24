@@ -372,7 +372,7 @@ impl<B: std::io::Read, Acc: Accum, LIMIT: SizeLimit> Collect<B, Acc, LIMIT> {
         let mut size = 0;
 
         'main: loop {
-            loop {
+            'reader: loop {
                 match self.body.read(&mut buffer[size..]) {
                     Ok(0) => break,
                     Ok(read_size) => {
@@ -380,11 +380,13 @@ impl<B: std::io::Read, Acc: Accum, LIMIT: SizeLimit> Collect<B, Acc, LIMIT> {
 
                         //Try to fill as much as possible
                         if buffer.len().saturating_sub(size) > 256 {
-                            continue;
+                            continue 'reader;
+                        } else {
+                            break 'reader;
                         }
                     },
                     Err(error) => match error.kind() {
-                        std::io::ErrorKind::Interrupted => continue,
+                        std::io::ErrorKind::Interrupted => continue 'reader,
                         _ => break 'main Err(CollectError::Transport(error))
                     }
                 }

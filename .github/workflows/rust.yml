@@ -22,5 +22,7 @@ jobs:
     if: github.event.pull_request.draft == false
     uses: DoumanAsh/douman-ci/.github/workflows/rust.yml@master
     with:
+      cargo-features: "std,http-body"
+      cargo-no-features: true
       min-rustc-version: "1.85.0"
       miri: true

@@ -20,6 +20,11 @@ version = "1"
 default-features = false
 features = ["std"]
 
+[dependencies.http-body]
+version = "1"
+default-features = false
+optional = true
+
 [dependencies.bytes]
 version = "1"
 default-features = false
@@ -37,6 +42,21 @@ default-features = false
 version = "1"
 default-features = false
 
+[dependencies.compu]
+version = "2"
+default-features = false
+features = ["zstd", "zlib-rust"]
+
 [dependencies.percent-encoding]
 version = "2"
 default-features = false
+
+[dev-dependencies.thread-waker]
+version = "1"
+
+[features]
+std = []
+http-body = ["dep:http-body"]
+
+[package.metadata.docs.rs]
+features = ["std", "http-body"]

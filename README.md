@@ -8,7 +8,14 @@ Extensions to provide useful utilities for http crate
 
 MSRV 1.85
 
-## uri
+## Feature
+
+- `std` - Enables use of `std` library
+- `http-body` - Enables use of `http-body` library
+
+## Modules
+
+### uri
 
 Uri module provides utilities for working with [Uri](https://docs.rs/http/latest/http/uri/struct.Uri.html)
 
@@ -35,3 +42,11 @@ let output = builder.try_into_http().expect("to finish building path and query")
 assert_eq!(output.path(), "/test/%E3%82%8D%E3%82%8A");
 assert_eq!(output.query(), Some("key%201=value%201&key%202=value%202"));
 ```
+
+### header
+
+Extension module to [HeaderMap](https://docs.rs/http/latest/http/header/struct.HeaderMap.html)
+
+### body
+
+Provides utilities to work with http bodies through [http-body](https://docs.rs/http-body/latest/http_body/trait.Body.html) or std's [io::Read](https://doc.rust-lang.org/std/io/trait.Read.html)

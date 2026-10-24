@@ -9,3 +9,5 @@ pub use http;
 
 pub mod uri;
 pub mod header;
+#[cfg(any(feature = "std", feature = "http-body"))]
+pub mod body;

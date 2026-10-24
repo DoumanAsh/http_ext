@@ -37,6 +37,7 @@ fn should_read_plain_http_body() {
     assert!(matches!(error, body::CollectError::Overflow));
 }
 
+#[cfg_attr(miri, ignore)]
 #[cfg(feature = "std")]
 #[test]
 fn should_auto_read_zstd_body() {
@@ -65,7 +66,7 @@ fn should_auto_read_gzip_body() {
     use compu::Encoder;
 
     let body = "123456789".repeat(1024);
-    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Gzip)).expect("to create zstd encoder");
+    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Gzip)).expect("to create zlib encoder");
     let mut compressed_body = Vec::new();
     encoder.encode_vec_full(body.as_bytes(), &mut compressed_body, compu::EncodeOp::Finish).expect("To compress");
 
@@ -87,7 +88,7 @@ fn should_auto_read_zlib_body() {
     use compu::Encoder;
 
     let body = "123456789".repeat(1024);
-    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Zlib)).expect("to create zstd encoder");
+    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Zlib)).expect("to create zlib encoder");
     let mut compressed_body = Vec::new();
     encoder.encode_vec_full(body.as_bytes(), &mut compressed_body, compu::EncodeOp::Finish).expect("To compress");
 
@@ -109,7 +110,7 @@ fn should_fail_auto_read_deflate_body() {
     use compu::Encoder;
 
     let body = "123456789".repeat(1024);
-    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Deflate)).expect("to create zstd encoder");
+    let mut encoder = compu::encoder::ZlibRust::new(compu::encoder::ZlibOptions::new().mode(compu::encoder::ZlibMode::Deflate)).expect("to create zlib encoder");
     let mut compressed_body = Vec::new();
     encoder.encode_vec_full(body.as_bytes(), &mut compressed_body, compu::EncodeOp::Finish).expect("To compress");
 

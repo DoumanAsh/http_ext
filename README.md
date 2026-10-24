@@ -19,7 +19,7 @@ MSRV 1.85
 
 Uri module provides utilities for working with [Uri](https://docs.rs/http/latest/http/uri/struct.Uri.html)
 
-### Path and query builder
+#### Path and query builder
 
 Stress free and efficient builder for [path and query](https://docs.rs/http/latest/http/uri/struct.PathAndQuery.html)
 
@@ -50,3 +50,23 @@ Extension module to [HeaderMap](https://docs.rs/http/latest/http/header/struct.H
 ### body
 
 Provides utilities to work with http bodies through [http-body](https://docs.rs/http-body/latest/http_body/trait.Body.html) or std's [io::Read](https://doc.rust-lang.org/std/io/trait.Read.html)
+
+#### Collect
+
+Utility to efficiently collect body into custom accumulator
+
+```rust
+use core::future::Future;
+
+use http_ext::body;
+
+fn collect_body<B: body::http_body::Body>(body: B) ->
+    impl Future<Output = Result<Vec<u8>, body::CollectError<B::Error, <Vec<u8> as body::Accum>::Error>>>
+    where B::Data: AsRef<[u8]>
+{
+    //Creates future that accumulates body content into Vec
+    //If body encrypted with zstd/gzip/zlib then automatically decode it when Identity is specified
+    //Otherwise you can specify specific encoding to use only specific decompressor
+    body::Collect::new(body, Vec::new()).with_encoding(body::ContentEncoding::Identity)
+}
+```

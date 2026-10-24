@@ -1,4 +1,6 @@
 //! Body utilities based on [http_body](https://crates.io/crates/http-body) crate
+//!
+//! This module is available if `std` and/or `http-body` features are enabled
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -8,7 +10,7 @@ use alloc::vec::Vec;
 use alloc::collections::{TryReserveError};
 
 #[cfg(feature = "http-body")]
-pub use http_body::Body;
+pub mod http_body;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 ///Supported [Content-Encoding](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Encoding)
@@ -74,7 +76,7 @@ impl SizeLimit for BytesLimit {
 ///Possible errors from [Collect]
 #[derive(Debug)]
 pub enum CollectError<T, C> {
-    ///Underlying error from [Body]
+    ///Underlying error from [Body](https://docs.rs/http-body/latest/http_body/trait.Body.html)
     Transport(T),
     ///Underlying error from [Accum]
     Accum(C),
@@ -84,7 +86,7 @@ pub enum CollectError<T, C> {
     ///
     ///This can only happen due to insufficient memory
     DecoderMemError,
-    ///Error decoding content of the [Body]
+    ///Error decoding content of the [Body](https://docs.rs/http-body/latest/http_body/trait.Body.html)
     DecoderError(compu::decoder::DecodeError),
 }
 
@@ -123,7 +125,7 @@ impl<T: fmt::Display, C: fmt::Display> fmt::Display for CollectError<T, C> {
 
 impl<T: fmt::Display + fmt::Debug, E: fmt::Display + fmt::Debug> core::error::Error for CollectError<T, E> {}
 
-///Interface to accumulate [Body]
+///Interface to accumulate [Body](https://docs.rs/http-body/latest/http_body/trait.Body.html)
 pub trait Accum: Unpin {
     ///Final result type
     type Output: Unpin;
@@ -292,7 +294,7 @@ impl<B, Acc: Accum> Collect<B, Acc, ()> {
     #[inline(always)]
     ///Creates new instance with provided `body` and `accum` with no limit on body size
     ///
-    ///`body` must be either [Body] or [Read](https://doc.rust-lang.org/std/io/trait.Read.html)
+    ///`body` must be either [Body](https://docs.rs/http-body/latest/http_body/trait.Body.html) or [Read](https://doc.rust-lang.org/std/io/trait.Read.html)
     pub const fn new(body: B, accum: Acc) -> Self {
         Self {
             body,
@@ -403,59 +405,6 @@ impl<B: std::io::Read, Acc: Accum, LIMIT: SizeLimit> Collect<B, Acc, LIMIT> {
 
             state.process_data(acc, limit, data)?;
             size = 0;
-        }
-    }
-}
-
-#[cfg(feature = "http-body")]
-impl<Data: AsRef<[u8]>, E, B: http_body::Body<Data = Data, Error = E>, Acc: Accum, LIMIT: SizeLimit> core::future::Future for Collect<B, Acc, LIMIT> {
-    type Output = Result<Acc::Output, CollectError<E, Acc::Error>>;
-
-    fn poll(self: core::pin::Pin<&mut Self>, ctx: &mut core::task::Context<'_>) -> core::task::Poll<Self::Output> {
-        use core::task::Poll;
-
-        //we do not move anything and there is no internal references
-        let this = unsafe {
-            self.get_unchecked_mut()
-        };
-
-        'main: loop {
-            let body = 'body: loop {
-                let body = unsafe {
-                    core::pin::Pin::new_unchecked(&mut this.body)
-                };
-                match http_body::Body::poll_frame(body, ctx) {
-                    Poll::Pending => break 'main Poll::Pending,
-                    Poll::Ready(Some(Ok(frame))) => match frame.into_data() {
-                        Ok(body) => {
-                            if body.as_ref().is_empty() {
-                                continue 'body
-                            } else {
-                                break 'body body;
-                            }
-                        }
-                        Err(frame) => match frame.into_trailers() {
-                            Ok(trailers) => this.accum.on_trailers(trailers),
-                            Err(_) => unreachable!()
-                        }
-                    },
-                    Poll::Ready(Some(Err(error))) => break 'main Poll::Ready(Err(CollectError::Transport(error))),
-                    Poll::Ready(None) => break 'main match this.accum.finish() {
-                        Ok(result) => Poll::Ready(Ok(result)),
-                        Err(error) => Poll::Ready(Err(CollectError::unlikely_collector(error))),
-                    },
-                }
-            };
-
-            let data = body.as_ref();
-            let (state, acc, limit) = match this.init_state(data) {
-                (Some(state), acc, limit) => (state, acc, limit),
-                _ => break 'main Poll::Ready(Err(CollectError::unlikely_decoder_mem_error()))
-            };
-
-            if let Err(error) = state.process_data(acc, limit, data) {
-                break 'main Poll::Ready(Err(error));
-            }
         }
     }
 }

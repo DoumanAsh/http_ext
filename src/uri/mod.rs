@@ -102,6 +102,15 @@ impl<P: PathEncoding> UriPathBuilder<P> {
         }.join(path)
     }
 
+    #[inline(always)]
+    ///Returns full path
+    pub fn as_str(&self) -> &str {
+        match core::str::from_utf8(self.output.as_ref()) {
+            Ok(value) => value,
+            Err(_) => unreachable!()
+        }
+    }
+
     #[inline]
     ///Join `self` with specified `path`
     pub fn join(mut self, path: &str) -> Self {
@@ -122,10 +131,17 @@ impl<P: PathEncoding> UriPathBuilder<P> {
         http::uri::PathAndQuery::from_maybe_shared(self.output.freeze())
     }
 
-    #[inline]
+    #[inline(always)]
     ///Starts building query part of the Uri using provided [encoder](QueryEncoding)
     pub fn with_query<Q: QueryEncoding>(self, encoder: Q) -> UriPathQueryBuilder<Q> {
         UriPathQueryBuilder::new(self, encoder)
+    }
+}
+
+impl<P: PathEncoding> AsRef<str> for UriPathBuilder<P> {
+    #[inline(always)]
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -158,6 +174,15 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
             output: path.output,
             query_set: false,
             encoder,
+        }
+    }
+
+    #[inline(always)]
+    ///Returns full path
+    pub fn as_str(&self) -> &str {
+        match core::str::from_utf8(self.output.as_ref()) {
+            Ok(value) => value,
+            Err(_) => unreachable!()
         }
     }
 
@@ -227,6 +252,13 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     ///Finalizes builder
     pub fn try_into_http(self) -> Result<http::uri::PathAndQuery, http::uri::InvalidUri> {
         http::uri::PathAndQuery::from_maybe_shared(self.output.freeze())
+    }
+}
+
+impl<P: QueryEncoding> AsRef<str> for UriPathQueryBuilder<P> {
+    #[inline(always)]
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 

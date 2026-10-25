@@ -7,6 +7,7 @@ fn should_build_plain_query() {
     let mut builder = uri::UriPathBuilder::new("/test", uri::PathEscape).join("ろり").with_query(uri::QueryEscape);
     builder.add_kv("key 1", "value 1")
            .add_kv("key 2", "value 2");
+    assert_eq!(builder.as_str(), "/test/%E3%82%8D%E3%82%8A?key%201=value%201&key%202=value%202");
     let output = builder.try_into_http().expect("to finish building path and query");
     assert_eq!(output.path(), "/test/%E3%82%8D%E3%82%8A");
     assert_eq!(output.query(), Some("key%201=value%201&key%202=value%202"));
@@ -14,6 +15,7 @@ fn should_build_plain_query() {
     let mut builder = uri::UriPathBuilder::new("/test", ()).join("ろり").with_query(());
     builder.add_kv("key+1", "value+1")
            .add_kv("key+2", "value+2");
+    assert_eq!(builder.as_str(), "/test/ろり?key+1=value+1&key+2=value+2");
     let output = builder.try_into_http().expect("to finish building path and query");
     assert_eq!(output.path(), "/test/ろり");
     assert_eq!(output.query(), Some("key+1=value+1&key+2=value+2"));

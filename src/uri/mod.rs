@@ -139,7 +139,7 @@ impl<P: PathEncoding> core::ops::Add<&str> for UriPathBuilder<P> {
 ///Efficient builder for [Uri](https://docs.rs/http/latest/http/uri/struct.Uri.html)'s query
 pub struct UriPathQueryBuilder<Q> {
     output: bytes::BytesMut,
-    len: usize,
+    query_set: bool,
     #[allow(unused)]
     encoder: Q,
 }
@@ -154,25 +154,29 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     pub fn new(path: UriPathBuilder<impl PathEncoding>, encoder: Q) -> Self {
         Self {
             output: path.output,
-            len: 0,
+            query_set: false,
             encoder,
+        }
+    }
+
+    fn prepare_next_query_value(&mut self) {
+        if self.query_set {
+            self.output.extend_from_slice(Self::QUERY_NEXT);
+        } else {
+            self.output.extend_from_slice(Self::QUERY_START);
         }
     }
 
     fn add_key(&mut self, key: &str) -> &mut Self {
         self.output.reserve(key.len().saturating_add(1));
 
-        if self.len == 0 {
-            self.output.extend_from_slice(Self::QUERY_START);
-        } else {
-            self.output.extend_from_slice(Self::QUERY_NEXT);
-        }
+        self.prepare_next_query_value();
 
         for component in Q::encode(key) {
             self.output.extend_from_slice(component.as_bytes());
         }
 
-        self.len = self.len.saturating_add(1);
+        self.query_set = true;
         self
     }
 
@@ -192,11 +196,7 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     pub fn add_kv(&mut self, key: &str, value: &str) -> &mut Self {
         self.output.reserve(key.len().saturating_add(value.len()).saturating_add(2));
 
-        if self.len == 0 {
-            self.output.extend_from_slice(Self::QUERY_START);
-        } else {
-            self.output.extend_from_slice(Self::QUERY_NEXT);
-        }
+        self.prepare_next_query_value();
 
         for component in Q::encode(key) {
             self.output.extend_from_slice(component.as_bytes());
@@ -208,7 +208,7 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
             self.output.extend_from_slice(component.as_bytes());
         }
 
-        self.len = self.len.saturating_add(1);
+        self.query_set = true;
         self
     }
 

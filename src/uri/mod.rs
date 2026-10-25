@@ -322,7 +322,7 @@ impl<T, Q: QueryEncoding> UriBuilderPathBuild<T, UriPathQueryBuilder<Q>> {
 
 impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::uri::Builder, B> {
     #[inline(always)]
-    ///Finish uri's path builder returning modified [http::Uri::Builder]
+    ///Finish uri's path builder returning modified [http::uri::Builder]
     pub fn finish_path(self) -> http::uri::Builder {
         let Self { inner, builder } = self;
         inner.path_and_query(builder)

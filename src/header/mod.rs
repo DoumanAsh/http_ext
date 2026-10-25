@@ -3,7 +3,7 @@
 pub use http::{HeaderMap, HeaderName, HeaderValue};
 
 mod fmt;
-pub use fmt::InspectHeaders;
+pub use fmt::{InspectHeaders, HeaderValueFmtBuffer};
 
 ///Common header name for request id
 pub const X_REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");

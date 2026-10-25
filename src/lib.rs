@@ -7,6 +7,22 @@ extern crate alloc;
 
 pub use http;
 
+#[cfg(debug_assertions)]
+macro_rules! unreach {
+    () => {
+        unreachable!()
+    }
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! unreach {
+    () => {
+        unsafe {
+            ::core::hint::unreachable_unchecked()
+        }
+    }
+}
+
 pub mod uri;
 pub use uri::{UriPathBuilder, UriBuilderExt};
 pub mod header;

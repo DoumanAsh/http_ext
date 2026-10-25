@@ -19,6 +19,11 @@ MSRV 1.85
 
 Uri module provides utilities for working with [Uri](https://docs.rs/http/latest/http/uri/struct.Uri.html)
 
+#### Extensions
+
+- [UriBuilderExt](https://docs.rs/http_ext/latest/http_ext/uri/trait.UriBuilderExt.html) - Extension method to start building uri on variety of http types
+- [RequestExt](https://docs.rs/http_ext/latest/http_ext/trait.RequestExt.html) - Request extension to modify existing uri
+
 #### Path and query builder
 
 Stress free and efficient builder for [path and query](https://docs.rs/http/latest/http/uri/struct.PathAndQuery.html)
@@ -46,6 +51,11 @@ assert_eq!(output.query(), Some("key%201=value%201&key%202=value%202"));
 ### header
 
 Extension module to [HeaderMap](https://docs.rs/http/latest/http/header/struct.HeaderMap.html)
+
+#### Extensions
+
+- [HeaderMapExt](https://docs.rs/http_ext/latest/http_ext/header/trait.HeaderMapExt.html) - Extension for [HeaderMap](https://docs.rs/http/latest/http/header/struct.HeaderMap.html)
+- [HttpExt](https://docs.rs/http_ext/latest/http_ext/trait.RequestExt.html) - General extension trait provides extract of the [HeaderMapExt](https://docs.rs/http_ext/latest/http_ext/header/trait.HeaderMapExt.html)
 
 ### body
 

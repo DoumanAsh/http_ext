@@ -49,7 +49,7 @@ impl PathEncoding for () {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 ///[PathEncoding] to escape invalid characters within url's path
 pub struct PathEscape;
 
@@ -74,7 +74,7 @@ impl QueryEncoding for () {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 ///[QueryEncoding] to escape invalid characters within url's query parameter list
 pub struct QueryEscape;
 
@@ -90,6 +90,14 @@ pub struct UriPathBuilder<P> {
     output: bytes::BytesMut,
     #[allow(unused)]
     encoder: P,
+}
+
+impl UriPathBuilder<PathEscape> {
+    #[inline]
+    ///Creates new Uri's path builder
+    pub fn new_escaped(path: &str) -> Self {
+        Self::new(path, PathEscape)
+    }
 }
 
 impl<P: PathEncoding> UriPathBuilder<P> {
@@ -136,6 +144,12 @@ impl<P: PathEncoding> UriPathBuilder<P> {
     pub fn with_query<Q: QueryEncoding>(self, encoder: Q) -> UriPathQueryBuilder<Q> {
         UriPathQueryBuilder::new(self, encoder)
     }
+
+    #[inline(always)]
+    ///Starts building query part of the Uri using [QueryEscape]
+    pub fn with_query_escaped(self) -> UriPathQueryBuilder<QueryEscape> {
+        self.with_query(QueryEscape)
+    }
 }
 
 impl<P: PathEncoding> AsRef<str> for UriPathBuilder<P> {
@@ -160,6 +174,14 @@ pub struct UriPathQueryBuilder<Q> {
     query_set: bool,
     #[allow(unused)]
     encoder: Q,
+}
+
+impl UriPathQueryBuilder<QueryEscape> {
+    #[inline]
+    ///Creates new Uri's path builder using [QueryEscape]
+    pub fn new_escaped(path: UriPathBuilder<impl PathEncoding>) -> Self {
+        Self::new(path, QueryEscape)
+    }
 }
 
 impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {

@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-//#![no_std]
+#![no_std]
 #![warn(missing_docs)]
 #![allow(clippy::style)]
 
@@ -8,7 +8,7 @@ extern crate alloc;
 pub use http;
 
 pub mod uri;
-pub use uri::UriPathBuilder;
+pub use uri::{UriPathBuilder, UriBuilderExt};
 pub mod header;
 pub use header::HeaderMapExt;
 #[cfg(any(feature = "std", feature = "http-body"))]
@@ -59,6 +59,37 @@ pub trait RequestExt {
     fn uri_mut(&mut self) -> &mut http::Uri;
     ///Access request headers
     fn headers(&self) -> &http::HeaderMap;
+
+    #[inline(always)]
+    ///Start building path using initial `path` from [http::Request::uri]
+    ///
+    ///If you need to guarantee to build valid path then use [RequestExt::build_path_escaped]
+    ///
+    ///```
+    ///use http_ext::{uri, RequestExt};
+    /////Build as part of request
+    ///let mut request = http::Request::new(());
+    ///request.build_path()
+    ///       .join_path("api")
+    ///       .join_path("v1")
+    ///       .join_path("logs")
+    ///       //Start query components
+    ///       .build_query(uri::QueryEscape)
+    ///       .add_kv_query("test 1", "value 1")
+    ///       .finish_path()
+    ///       .expect("to build uri");
+    ///assert_eq!(request.uri().path(), "/api/v1/logs");
+    ///assert_eq!(request.uri().query(), Some("test%201=value%201"));
+    ///```
+    fn build_path(&mut self) -> uri::UriBuilderPathBuild<&mut http::Uri, uri::UriPathBuilder<()>> {
+        self.uri_mut().build_path(())
+    }
+
+    #[inline(always)]
+    ///Start building path using initial `path` from [http::Request::uri]
+    fn build_path_escaped(&mut self) -> uri::UriBuilderPathBuild<&mut http::Uri, uri::UriPathBuilder<uri::PathEscape>> {
+        self.uri_mut().build_path(uri::PathEscape)
+    }
 
     #[inline(always)]
     ///Accesses [header::X_REQUEST_ID] value if any is present

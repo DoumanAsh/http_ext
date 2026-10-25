@@ -1,5 +1,7 @@
 //!URI module
 
+use core::{mem, ops};
+
 pub use http::uri::{Uri, InvalidUri};
 
 mod serde;
@@ -215,7 +217,7 @@ impl<Q: QueryEncoding> UriPathQueryBuilder<Q> {
     #[inline(always)]
     ///Adds pairs of key and values from `object`
     ///
-    ///`object` must map/struct or sequence/tuple of pairs.
+    ///`object` must map/struct or sequence/tuple of pairs of string and string convertable values.
     pub fn add_serde(&mut self, object: impl serde::Serialize) -> Result<&mut Self, serde::Error> {
         object.serialize(serde::QueryVisitor::new(self))?;
         Ok(self)
@@ -243,5 +245,253 @@ impl<Q: QueryEncoding> TryFrom<UriPathQueryBuilder<Q>> for http::uri::PathAndQue
     #[inline(always)]
     fn try_from(value: UriPathQueryBuilder<Q>) -> Result<Self, Self::Error> {
         value.try_into_http()
+    }
+}
+
+///Ongoing url builder with following type parameters
+///
+///- `T` - destination where Uri will be stored
+///- `B` - actual builder ongoing. Implements `DerefMut`
+pub struct UriBuilderPathBuild<T, B> {
+    inner: T,
+    builder: B
+}
+
+impl<T, B> ops::Deref for UriBuilderPathBuild<T, B> {
+    type Target = B;
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
+}
+
+impl<T, B> ops::DerefMut for UriBuilderPathBuild<T, B> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.builder
+    }
+}
+
+impl<T, P: PathEncoding> UriBuilderPathBuild<T, UriPathBuilder<P>> {
+    #[inline(always)]
+    ///Join `self` with specified `path`
+    pub fn join_path(self, path: &str) -> Self {
+        let Self { inner, builder } = self;
+        Self {
+            inner,
+            builder: builder.join(path)
+        }
+    }
+
+    #[inline(always)]
+    ///Starts building query part of the Uri using provided [encoder](QueryEncoding)
+    pub fn build_query<Q: QueryEncoding>(self, encoder: Q) -> UriBuilderPathBuild<T, UriPathQueryBuilder<Q>> {
+        let Self { inner, builder } = self;
+        UriBuilderPathBuild {
+            inner,
+            builder: builder.with_query(encoder),
+        }
+    }
+}
+
+impl<T, Q: QueryEncoding> UriBuilderPathBuild<T, UriPathQueryBuilder<Q>> {
+    #[inline(always)]
+    ///Adds `key` and `value` to the query parameters
+    pub fn add_kv_query(self, key: &str, value: &str) -> Self {
+        let Self { inner, mut builder } = self;
+        builder.add_kv(key, value);
+        UriBuilderPathBuild {
+            inner,
+            builder,
+        }
+    }
+
+    #[inline(always)]
+    ///Adds pairs of key and values from `object`
+    ///
+    ///`object` must map/struct or sequence/tuple of pairs of string and string convertable values.
+    pub fn add_serde_query(self, object: impl serde::Serialize) -> Result<Self, serde::Error> {
+        let Self { inner, mut builder } = self;
+        builder.add_serde(object)?;
+        Ok(UriBuilderPathBuild {
+            inner,
+            builder,
+        })
+    }
+}
+
+impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::uri::Builder, B> {
+    #[inline(always)]
+    ///Finish builder setting [http::uri::PathAndQuery] into [http::uri::Builder]
+    pub fn finish_path(self) -> http::uri::Builder {
+        let Self { inner, builder } = self;
+        inner.path_and_query(builder)
+    }
+}
+
+impl<'a, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<&'a mut http::Uri, B> {
+    #[inline(always)]
+    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    pub fn finish_path(self) -> Result<&'a mut http::Uri, http::uri::InvalidUri> {
+        let Self { inner, builder } = self;
+
+        let temp = mem::take(inner);
+        let mut parts = temp.into_parts();
+        parts.path_and_query = Some(builder.try_into()?);
+        match http::Uri::from_parts(parts) {
+            Ok(uri) => {
+                *inner = uri;
+                Ok(inner)
+            },
+            Err(_) => unreachable!()
+        }
+    }
+}
+
+impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::Uri, B> {
+    #[inline(always)]
+    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    pub fn finish_path(self) -> Result<http::Uri, http::uri::InvalidUri> {
+        let Self { inner, builder } = self;
+
+        let mut parts = inner.into_parts();
+        parts.path_and_query = Some(builder.try_into()?);
+        match http::Uri::from_parts(parts) {
+            Ok(uri) => Ok(uri),
+            Err(_) => unreachable!()
+        }
+    }
+}
+
+impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::request::Parts, B> {
+    #[inline(always)]
+    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    pub fn finish_path(self) -> Result<http::request::Parts, http::uri::InvalidUri> {
+        let Self { mut inner, builder } = self;
+
+        inner.uri = UriBuilderPathBuild {
+            inner: inner.uri,
+            builder,
+        }.finish_path()?;
+        Ok(inner)
+    }
+}
+
+impl<T, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::Request<T>, B> {
+    #[inline(always)]
+    ///Finish builder setting [http::Request] into [http::uri::Builder]
+    pub fn finish_path(self) -> Result<http::Request<T>, http::uri::InvalidUri> {
+        let Self { inner, builder } = self;
+
+        let (mut parts, body) = inner.into_parts();
+        parts = UriBuilderPathBuild {
+            inner: parts,
+            builder,
+        }.finish_path()?;
+        Ok(http::Request::from_parts(parts, body))
+    }
+}
+
+///Extension trait to build [Uri]
+///
+///```
+///use http_ext::uri::{self, Uri, UriBuilderExt};
+///
+/////Build URI only
+///let uri = Uri::builder().scheme("http")
+///                        .authority("localhost")
+///                        //Start building path using extension trait from `/`
+///                        .build_path(uri::PathEscape)
+///                        .join_path("api")
+///                        .join_path("v1")
+///                        .join_path("logs")
+///                        //Start query components
+///                        .build_query(uri::QueryEscape)
+///                        .add_kv_query("test 1", "value 1")
+///                        //You can finish path builder at any time
+///                        .finish_path()
+///                        .build()
+///                        .expect("to build uri");
+///
+///assert_eq!(uri.path(), "/api/v1/logs");
+///assert_eq!(uri.query(), Some("test%201=value%201"));
+///
+/////Build as part of request
+///let request = http::Request::new(()).build_path(uri::PathEscape)
+///                                    .join_path("api")
+///                                    .join_path("v1")
+///                                    .join_path("logs")
+///                                    //Start query components
+///                                    .build_query(uri::QueryEscape)
+///                                    .add_kv_query("test 1", "value 1")
+///                                    .finish_path()
+///                                    .expect("to build uri");
+///assert_eq!(request.uri().path(), "/api/v1/logs");
+///assert_eq!(request.uri().query(), Some("test%201=value%201"));
+///```
+pub trait UriBuilderExt: Sized {
+    ///Start building path using initial path and specified [PathEncoding]
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>>;
+}
+
+impl UriBuilderExt for http::uri::Builder {
+    ///Starts building from `/`
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>> {
+        UriBuilderPathBuild {
+            inner: self,
+            builder: UriPathBuilder::new("/", encoding),
+        }
+    }
+}
+
+impl UriBuilderExt for &mut http::Uri {
+    ///Start building path using initial `path` from [http::Uri::path] and specified [PathEncoding]
+    ///
+    ///NOTE: [http::Uri::query] is always ignored
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>> {
+        let builder = UriPathBuilder::new(self.path(), encoding);
+        UriBuilderPathBuild {
+            inner: self,
+            builder,
+        }
+    }
+}
+
+impl UriBuilderExt for http::Uri {
+    ///Start building path using initial `path` from [http::Uri::path] and specified [PathEncoding]
+    ///
+    ///NOTE: [http::Uri::query] is always ignored
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>> {
+        let builder = UriPathBuilder::new(self.path(), encoding);
+        UriBuilderPathBuild {
+            inner: self,
+            builder,
+        }
+    }
+}
+
+impl UriBuilderExt for http::request::Parts {
+    ///Start building path using initial `path` from [http::request::Parts::uri] and specified [PathEncoding]
+    ///
+    ///NOTE: [http::Uri::query] is always ignored
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>> {
+        let builder = UriPathBuilder::new(self.uri.path(), encoding);
+        UriBuilderPathBuild {
+            inner: self,
+            builder,
+        }
+    }
+}
+
+impl<B> UriBuilderExt for http::Request<B> {
+    ///Start building path using initial `path` from [http::Request::uri] and specified [PathEncoding]
+    ///
+    ///NOTE: [http::Uri::query] is always ignored
+    fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>> {
+        let builder = UriPathBuilder::new(self.uri().path(), encoding);
+        UriBuilderPathBuild {
+            inner: self,
+            builder,
+        }
     }
 }

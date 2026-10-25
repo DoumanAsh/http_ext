@@ -10,8 +10,9 @@ MSRV 1.85
 
 ## Feature
 
-- `std` - Enables use of `std` library
-- `http-body` - Enables use of `http-body` library
+- `body` - Enables [body](https://docs.rs/http_ext/latest/http_ext/body/index.html) module.
+- `std` - Enables use of `std` library. Enables `body` feature with [read_all](https://docs.rs/http_ext/latest/http_ext/body/struct.Collect.html#method.read_all) method to process sync IO bodies that implement `io::Read` trait.
+- `http-body` - Enables use of `http-body` library. Enables `body` feature. Implements `Future` on the [body::Collect](https://docs.rs/http_ext/latest/http_ext/body/struct.Collect.html#impl-Future-for-Collect%3CB,+Acc,+LIMIT%3E) to process body that implements [http_body::Body](https://docs.rs/http_ext/latest/http_ext/body/http_body/trait.Body.html)
 
 ## Modules
 

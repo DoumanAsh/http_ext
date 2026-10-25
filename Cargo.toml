@@ -1,6 +1,6 @@
 [package]
 name = "http_ext"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 rust-version = "1.85"
 description = "Extensions to provide useful utilities for http crate"
@@ -46,6 +46,7 @@ default-features = false
 [dependencies.compu]
 version = "2.0.2"
 default-features = false
+optional = true
 features = ["zstd", "zlib-rust"]
 
 [dependencies.percent-encoding]
@@ -56,8 +57,9 @@ default-features = false
 version = "1"
 
 [features]
-std = []
-http-body = ["dep:http-body"]
+body = ["compu"]
+std = ["body"]
+http-body = ["dep:http-body", "body"]
 
 [package.metadata.docs.rs]
 features = ["std", "http-body"]

@@ -11,9 +11,9 @@ pub mod uri;
 pub use uri::{UriPathBuilder, UriBuilderExt};
 pub mod header;
 pub use header::HeaderMapExt;
-#[cfg(any(feature = "std", feature = "http-body"))]
+#[cfg(feature = "body")]
 pub mod body;
-#[cfg(any(feature = "std", feature = "http-body"))]
+#[cfg(feature = "body")]
 pub use body::Collect;
 
 ///Extension to all [http] types

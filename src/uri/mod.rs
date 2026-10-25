@@ -322,7 +322,7 @@ impl<T, Q: QueryEncoding> UriBuilderPathBuild<T, UriPathQueryBuilder<Q>> {
 
 impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::uri::Builder, B> {
     #[inline(always)]
-    ///Finish builder setting [http::uri::PathAndQuery] into [http::uri::Builder]
+    ///Finish uri's path builder returning modified [http::Uri::Builder]
     pub fn finish_path(self) -> http::uri::Builder {
         let Self { inner, builder } = self;
         inner.path_and_query(builder)
@@ -331,7 +331,7 @@ impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuil
 
 impl<'a, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<&'a mut http::Uri, B> {
     #[inline(always)]
-    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    ///Finish uri's path builder writing into reference of [http::Uri]
     pub fn finish_path(self) -> Result<&'a mut http::Uri, http::uri::InvalidUri> {
         let Self { inner, builder } = self;
 
@@ -350,7 +350,7 @@ impl<'a, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> Uri
 
 impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::Uri, B> {
     #[inline(always)]
-    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    ///Finish uri's path builder returning modified [http::Uri]
     pub fn finish_path(self) -> Result<http::Uri, http::uri::InvalidUri> {
         let Self { inner, builder } = self;
 
@@ -365,7 +365,7 @@ impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuil
 
 impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::request::Parts, B> {
     #[inline(always)]
-    ///Finish builder setting [http::request::Parts] into [http::uri::Builder]
+    ///Finish uri's path builder returning modified [http::request::Parts]
     pub fn finish_path(self) -> Result<http::request::Parts, http::uri::InvalidUri> {
         let Self { mut inner, builder } = self;
 
@@ -379,7 +379,7 @@ impl<B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuil
 
 impl<T, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriBuilderPathBuild<http::Request<T>, B> {
     #[inline(always)]
-    ///Finish builder setting [http::Request] into [http::uri::Builder]
+    ///Finish uri's path builder returning modified [http::Request]
     pub fn finish_path(self) -> Result<http::Request<T>, http::uri::InvalidUri> {
         let Self { inner, builder } = self;
 

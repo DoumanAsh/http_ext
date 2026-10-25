@@ -63,7 +63,7 @@ Provides utilities to work with http bodies through [http-body](https://docs.rs/
 
 #### Collect
 
-Utility to efficiently collect body into custom accumulator
+[Collect](https://docs.rs/http_ext/latest/http_ext/body/struct.Collect.html) is an utility to efficiently collect body into custom accumulator
 
 ```rust
 use core::future::Future;

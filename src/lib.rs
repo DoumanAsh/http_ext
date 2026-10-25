@@ -13,6 +13,8 @@ pub mod header;
 pub use header::HeaderMapExt;
 #[cfg(any(feature = "std", feature = "http-body"))]
 pub mod body;
+#[cfg(any(feature = "std", feature = "http-body"))]
+pub use body::Collect;
 
 ///Extension to all [http] types
 pub trait HttpExt {

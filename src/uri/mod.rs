@@ -102,6 +102,14 @@ impl UriPathBuilder<PathEscape> {
     }
 }
 
+impl UriPathBuilder<()> {
+    #[inline]
+    ///Creates new Uri's path builder
+    pub fn new_unescaped(path: &str) -> Self {
+        Self::new(path, ())
+    }
+}
+
 impl<P: PathEncoding> UriPathBuilder<P> {
     #[inline]
     ///Creates new Uri's path builder
@@ -215,6 +223,14 @@ impl UriPathQueryBuilder<QueryEscape> {
     ///Creates new Uri's path builder using [QueryEscape]
     pub fn new_escaped(path: UriPathBuilder<impl PathEncoding>) -> Self {
         Self::new(path, QueryEscape)
+    }
+}
+
+impl UriPathQueryBuilder<()> {
+    #[inline]
+    ///Creates new Uri's path builder with no escaping.
+    pub fn new_unescaped(path: UriPathBuilder<impl PathEncoding>) -> Self {
+        Self::new(path, ())
     }
 }
 
@@ -530,6 +546,14 @@ impl<T, B: TryInto<http::uri::PathAndQuery, Error = http::uri::InvalidUri>> UriB
 pub trait UriBuilderExt: Sized {
     ///Start building path using initial path and specified [PathEncoding]
     fn build_path<P: PathEncoding>(self, encoding: P) -> UriBuilderPathBuild<Self, UriPathBuilder<P>>;
+    ///Start building path using initial path with [PathEscape] to automatically escape characters in path
+    fn build_path_escaped(self) -> UriBuilderPathBuild<Self, UriPathBuilder<PathEscape>> {
+        Self::build_path(self, PathEscape)
+    }
+    ///Start building path using initial path with no character escaping
+    fn build_path_unescaped(self) -> UriBuilderPathBuild<Self, UriPathBuilder<()>> {
+        Self::build_path(self, ())
+    }
 }
 
 impl UriBuilderExt for http::uri::Builder {

@@ -104,9 +104,15 @@ pub trait RequestExt {
     }
 
     #[inline(always)]
-    ///Start building path using initial `path` from [http::Request::uri]
+    ///Start building path using initial `path` from [http::Request::uri] while escaping characters
     fn build_path_escaped(&mut self) -> uri::UriBuilderPathBuild<&mut http::Uri, uri::UriPathBuilder<uri::PathEscape>> {
-        self.uri_mut().build_path(uri::PathEscape)
+        self.uri_mut().build_path_escaped()
+    }
+
+    #[inline(always)]
+    ///Start building path using initial `path` from [http::Request::uri] without escaping characters
+    fn build_path_unescaped(&mut self) -> uri::UriBuilderPathBuild<&mut http::Uri, UriPathBuilder<()>> {
+        self.uri_mut().build_path_unescaped()
     }
 
     #[inline(always)]

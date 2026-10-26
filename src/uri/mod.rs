@@ -6,6 +6,8 @@ pub use http::uri::{Uri, InvalidUri};
 
 mod serde;
 
+const PATH_SEP: &[u8] = b"/";
+
 mod encodings {
     pub const PATH: percent_encoding::AsciiSet = percent_encoding::CONTROLS.add(b' ')
                                                                            .add(b'"')
@@ -104,10 +106,16 @@ impl<P: PathEncoding> UriPathBuilder<P> {
     #[inline]
     ///Creates new Uri's path builder
     pub fn new(path: &str, encoder: P) -> Self {
-        Self {
+        let this = Self {
             output: bytes::BytesMut::new(),
             encoder,
-        }.join(path)
+        };
+
+        if path.is_empty() {
+            this
+        } else {
+            this.join(path)
+        }
     }
 
     #[inline(always)]
@@ -121,15 +129,41 @@ impl<P: PathEncoding> UriPathBuilder<P> {
 
     #[inline]
     ///Join `self` with specified `path`
-    pub fn join(mut self, path: &str) -> Self {
-        let path = path.strip_prefix('/').unwrap_or(path);
+    ///
+    ///If `path` is empty, then `/` is appended only if previously there was none.
+    pub fn join(mut self, mut path: &str) -> Self {
+        path = path.strip_prefix('/').unwrap_or(path);
         self.output.reserve(path.len().saturating_add(1));
-        if !self.output.ends_with(b"/") {
-            self.output.extend_from_slice(b"/");
+
+        if !self.output.ends_with(PATH_SEP) {
+            self.output.extend_from_slice(PATH_SEP);
         }
+
         for path in P::encode(path) {
             self.output.extend_from_slice(path.as_bytes());
         }
+        self
+    }
+
+    #[inline]
+    ///Join `self` with multiple `path`
+    ///
+    ///If `path` is empty, then `/` is appended only if previously there was none.
+    pub fn join_many(mut self, path: &[&str]) -> Self {
+        let sum = path.iter().map(|val| val.len()).sum();
+        self.output.reserve(sum);
+
+        for path in path.iter() {
+            if !self.output.ends_with(PATH_SEP) {
+                self.output.extend_from_slice(PATH_SEP);
+            }
+
+            let path = path.strip_prefix('/').unwrap_or(path);
+            for path in P::encode(path) {
+                self.output.extend_from_slice(path.as_bytes());
+            }
+        }
+
         self
     }
 
@@ -334,6 +368,16 @@ impl<T, P: PathEncoding> UriBuilderPathBuild<T, UriPathBuilder<P>> {
         Self {
             inner,
             builder: builder.join(path)
+        }
+    }
+
+    #[inline(always)]
+    ///Join `self` with multiple `path`
+    pub fn join_paths(self, path: &[&str]) -> Self {
+        let Self { inner, builder } = self;
+        Self {
+            inner,
+            builder: builder.join_many(path)
         }
     }
 

@@ -19,6 +19,15 @@ fn should_build_plain_query() {
     let output = builder.try_into_http().expect("to finish building path and query");
     assert_eq!(output.path(), "/test/ろり");
     assert_eq!(output.query(), Some("key+1=value+1&key+2=value+2"));
+
+    //Ensure empty path components are collapsed
+    let mut builder = uri::UriPathBuilder::new("/", ()).join_many(&["", "cute", "is", "justice"]).join("").with_query(());
+    builder.add_kv("key+1", "value+1")
+           .add_kv("key+2", "value+2");
+    assert_eq!(builder.as_str(), "/cute/is/justice/?key+1=value+1&key+2=value+2");
+    let output = builder.try_into_http().expect("to finish building path and query");
+    assert_eq!(output.path(), "/cute/is/justice/");
+    assert_eq!(output.query(), Some("key+1=value+1&key+2=value+2"));
 }
 
 #[cfg(feature = "std")]

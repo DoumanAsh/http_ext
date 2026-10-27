@@ -77,6 +77,8 @@ pub trait RequestExt {
     fn uri_mut(&mut self) -> &mut http::Uri;
     ///Access request headers
     fn headers(&self) -> &http::HeaderMap;
+    ///Access request headers via mutable reference
+    fn headers_mut(&mut self) -> &mut http::HeaderMap;
 
     #[inline(always)]
     ///Start building path using initial `path` from [http::Request::uri]
@@ -126,6 +128,18 @@ pub trait RequestExt {
     fn inspect_headers<'a>(&'a self, headers: &'a [&'a http::HeaderName]) -> header::InspectHeaders<'a, http::HeaderValue> {
         self.headers().inspect_headers(headers)
     }
+
+    ///Sets `Accept-Encoding` header with what available in this crate by default
+    ///
+    ///If `body` feature is not enabled, then no header is set (meaning identity encoding is the only one supported)
+    fn set_supported_accept_encoding(&mut self) {
+        #[cfg(feature = "body")]
+        {
+            const VALUE: http::HeaderValue = http::HeaderValue::from_static("zstd,gzip");
+
+            self.headers_mut().insert(http::header::ACCEPT_ENCODING, VALUE);
+        }
+    }
 }
 
 impl RequestExt for http::request::Parts {
@@ -137,6 +151,10 @@ impl RequestExt for http::request::Parts {
     fn headers(&self) -> &http::HeaderMap {
         &self.headers
     }
+    #[inline(always)]
+    fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        &mut self.headers
+    }
 }
 
 impl<T> RequestExt for http::Request<T> {
@@ -144,9 +162,12 @@ impl<T> RequestExt for http::Request<T> {
     fn uri_mut(&mut self) -> &mut http::Uri {
         http::Request::uri_mut(self)
     }
-
     #[inline(always)]
     fn headers(&self) -> &http::HeaderMap {
         self.headers()
+    }
+    #[inline(always)]
+    fn headers_mut(&mut self) -> &mut http::HeaderMap {
+        self.headers_mut()
     }
 }

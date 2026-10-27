@@ -1,12 +1,67 @@
 //! Header module
 
 pub use http::{HeaderMap, HeaderName, HeaderValue};
+use http::header::ACCEPT_ENCODING;
 
 mod fmt;
 pub use fmt::{InspectHeaders, HeaderValueFmtBuffer};
 
 ///Common header name for request id
 pub const X_REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
+
+///Iterator over `Accept-Encoding` returning pairs of `(&str, f32)` which represents name of the encoding and requested quality (default quality is 1.0)
+pub struct AcceptEncodingIter<'a, T> {
+    headers: http::header::ValueIter<'a, T>,
+    cursor: Option<core::str::Split<'a, char>>
+}
+
+impl<'a, T: AsRef<[u8]>> Iterator for AcceptEncodingIter<'a, T> {
+    type Item = (&'a str, f32);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        #[inline(always)]
+        fn extract_quality_value(value: &str) -> Option<f32> {
+            value.strip_prefix("q=").or_else(|| value.strip_prefix("Q=")).and_then(|value| value.trim().parse().ok())
+        }
+
+        'iter: loop {
+            match &mut self.cursor {
+                Some(iter) => match iter.next() {
+                    Some(value) => {
+                        let mut value = value.splitn(2, ';');
+                        //First element in split always returns
+                        let encoding = match value.next() {
+                            Some(encoding) => encoding.trim(),
+                            None => unreach!()
+                        };
+                        let quality = value.next().and_then(extract_quality_value).unwrap_or(1.0f32);
+                        break 'iter Some((encoding, quality));
+                    },
+                    None => {
+                        self.cursor.take();
+                        continue 'iter;
+                    }
+                },
+                None => {
+                    let value = 'headers: loop {
+                        let value = self.headers.next()?;
+                        match core::str::from_utf8(value.as_ref()) {
+                            Ok(value) => break 'headers value.trim(),
+                            Err(_) => continue 'headers,
+                        }
+                    };
+
+                    if value.is_empty() {
+                        continue 'iter;
+                    }
+
+                    self.cursor = Some(value.split(','));
+                }
+            }
+        }
+    }
+}
 
 ///Extension trait for [HeaderMap](https://docs.rs/http/latest/http/header/struct.HeaderMap.html)
 ///
@@ -39,6 +94,8 @@ pub trait HeaderMapExt<T> {
 
     ///Returns debug formatter to inspect specified list of `headers`
     fn inspect_headers<'a>(&'a self, headers: &'a [&'a http::HeaderName]) -> InspectHeaders<'a, T>;
+    ///Returns iterator [AcceptEncodingIter] over `Accept-Encoding` header values
+    fn accept_encoding_iter<'a>(&'a self) -> AcceptEncodingIter<'a, T> where T: 'a + AsRef<[u8]>;
 }
 
 impl<T> HeaderMapExt<T> for http::HeaderMap<T> {
@@ -52,6 +109,14 @@ impl<T> HeaderMapExt<T> for http::HeaderMap<T> {
         InspectHeaders {
             header_list,
             headers: self,
+        }
+    }
+
+    #[inline(always)]
+    fn accept_encoding_iter<'a>(&'a self) -> AcceptEncodingIter<'a, T> where T: 'a + AsRef<[u8]> {
+        AcceptEncodingIter {
+            headers: self.get_all(ACCEPT_ENCODING).into_iter(),
+            cursor: None
         }
     }
 }

@@ -48,6 +48,12 @@ pub trait HttpExt {
     fn inspect_headers<'a>(&'a self, headers: &'a [&'a http::HeaderName]) -> header::InspectHeaders<'a, http::HeaderValue> {
         self.headers().inspect_headers(headers)
     }
+
+    #[inline(always)]
+    ///Returns iterator [header::AcceptEncodingIter] over `Accept-Encoding` header values
+    fn accept_encoding_iter<'a>(&'a self) -> header::AcceptEncodingIter<'a, http::HeaderValue> {
+        self.headers().accept_encoding_iter()
+    }
 }
 
 impl HttpExt for http::request::Parts {
@@ -139,6 +145,12 @@ pub trait RequestExt {
 
             self.headers_mut().insert(http::header::ACCEPT_ENCODING, VALUE);
         }
+    }
+
+    #[inline(always)]
+    ///Returns iterator [header::AcceptEncodingIter] over `Accept-Encoding` header values
+    fn accept_encoding_iter<'a>(&'a self) -> header::AcceptEncodingIter<'a, http::HeaderValue> {
+        self.headers().accept_encoding_iter()
     }
 }
 

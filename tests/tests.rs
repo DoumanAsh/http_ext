@@ -1,4 +1,6 @@
-use http_ext::{uri, body};
+use http_ext::{uri, RequestExt};
+#[cfg(feature = "body")]
+use http_ext::body;
 
 mod serde;
 
@@ -28,6 +30,23 @@ fn should_build_plain_query() {
     let output = builder.try_into_http().expect("to finish building path and query");
     assert_eq!(output.path(), "/cute/is/justice/");
     assert_eq!(output.query(), Some("key+1=value+1&key+2=value+2"));
+}
+
+#[test]
+fn should_process_accept_encoding() {
+    const VALUE: http::HeaderValue = http::HeaderValue::from_static("zstd;, gzip;q=0.8, *;q=0.1");
+    let mut req = http::Request::new(());
+    req.headers_mut().insert(http::header::ACCEPT_ENCODING, VALUE);
+
+    let result = req.accept_encoding_iter().collect::<Vec<_>>();
+    assert_eq!(result.len(), 3);
+
+    assert_eq!(result[0].0, "zstd");
+    assert_eq!(result[0].1, 1.0);
+    assert_eq!(result[1].0, "gzip");
+    assert_eq!(result[1].1, 0.8);
+    assert_eq!(result[2].0, "*");
+    assert_eq!(result[2].1, 0.1);
 }
 
 #[cfg(feature = "std")]
